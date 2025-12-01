@@ -10,7 +10,12 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "5433:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U library_user -d library_db" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   redis:
     image: redis:6
@@ -27,8 +32,10 @@ services:
     env_file:
       - .env
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
   celery:
     build: .
@@ -40,6 +47,18 @@ services:
     depends_on:
       - web
       - redis
+
+  celery-beat:
+    build: .
+    command: celery -A library_system beat -l info
+    volumes:
+      - .:/code
+    env_file:
+      - .env
+    depends_on:
+      - web
+      - redis
+
 
 volumes:
   postgres_data:
